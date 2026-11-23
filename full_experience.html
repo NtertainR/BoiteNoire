@@ -74,6 +74,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            will-change: transform;
         }
 
         .camera {
@@ -115,6 +116,7 @@
             transform-style: preserve-3d;
             animation: bob 3s ease-in-out infinite;
             cursor: pointer;
+            will-change: transform;
         }
 
         .face {
@@ -129,9 +131,23 @@
                         border-color 0.8s, 
                         box-shadow 0.8s,
                         background-color 0.8s;
+            will-change: transform;
         }
 
         .base { top: -112.5px; left: -112.5px; }
+
+        #box-thumbnail {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            max-width: 85%;
+            max-height: 85%;
+            object-fit: contain;
+            margin: auto;
+            display: block;
+            pointer-events: none;
+        }
 
         .logo {
             position: absolute;
@@ -315,6 +331,7 @@
                 <div class="box-wrapper folded">
                     <!-- Base -->
                     <div class="face base">
+                        <canvas id="box-thumbnail"></canvas>
                         <!-- Front & Lid -->
                         <div class="face front">
                             <div class="logo"><img src="https://NtertainR.github.io/files/boitenoire.png" alt="logo"></div>
@@ -349,7 +366,7 @@
         <main id="slider-container">
             <!-- Dynamically Injected Slides -->
             <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center z-50 text-white font-sans uppercase tracking-[0.3em] text-sm opacity-100 transition-opacity duration-500">
-            <!--    <div class="animate-pulse">Loading Document...</div> -->
+                <div class="animate-pulse">Loading Document...</div>
             </div>
         </main>
     </div>
@@ -373,9 +390,13 @@
             const sliderContainer = document.getElementById('slider-container');
             const progressBar = document.getElementById('progress-bar');
             const loadingIndicator = document.getElementById('loading-indicator');
+            const boxThumbnail = document.getElementById('box-thumbnail');
 
-            const pdfUrl = 'https://NtertainR.github.io/files/prop_serv1.pdf';
+            const pdfUrl = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/web/compressed.tracemonkey-pldi-09.pdf';
             const logoUrl = 'https://NtertainR.github.io/files/boitenoire.png';
+
+            // Initialize PDF Engine immediately on load so the thumbnail is ready
+            initializePresentationEngine();
 
             // --- CORE LOGIC: THE 3D UNBOXING ---
             let isUnboxing = false;
@@ -422,12 +443,9 @@
                             unboxingScene.style.opacity = '0';
                             presentationApp.classList.add('active');
                             
-                            // Initialize PDF Engine when the presentation becomes active
-                            initializePresentationEngine();
-                            
                             // Cleanup 3D scene from DOM to save resources
                             setTimeout(() => unboxingScene.remove(), 1000);
-                        }, 1300); // Trigger near end of camera zoom
+                        }, 1150); // Triggered slightly earlier for a seamless overlap during the end of the camera zoom
                         
                     }, 1200);
                 }, 900);
@@ -462,6 +480,14 @@
                         await page.render({ canvasContext: context, viewport: viewport }).promise;
                         const imgData = canvas.toDataURL('image/jpeg', 0.9);
                         
+                        // Render the first page into the 3D Box Thumbnail
+                        if (pageNum === 1) {
+                            boxThumbnail.width = viewport.width;
+                            boxThumbnail.height = viewport.height;
+                            const thumbCtx = boxThumbnail.getContext('2d');
+                            thumbCtx.drawImage(canvas, 0, 0);
+                        }
+
                         sliderHTML += `
                             <section class="slide">
                                 <div class="slide-inner page-content" data-state="bottom">
@@ -472,6 +498,19 @@
                     }
                 } catch (error) {
                     console.warn("PDF Load Failed (CORS). Using fallbacks.", error);
+                    
+                    // Fallback Thumbnail for the 3D Box
+                    boxThumbnail.width = 850;
+                    boxThumbnail.height = 1100;
+                    const thumbCtx = boxThumbnail.getContext('2d');
+                    thumbCtx.fillStyle = 'white';
+                    thumbCtx.fillRect(0, 0, 850, 1100);
+                    thumbCtx.fillStyle = '#d1d5db';
+                    thumbCtx.font = '200px serif';
+                    thumbCtx.textAlign = 'center';
+                    thumbCtx.textBaseline = 'middle';
+                    thumbCtx.fillText('01', 425, 550);
+
                     for (let i = 1; i <= 5; i++) {
                         sliderHTML += `
                             <section class="slide">
